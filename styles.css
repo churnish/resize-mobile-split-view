@@ -1,4 +1,4 @@
-.rmsv-divider-active {
+.workspace-leaf-resize-handle.rmsv-divider-active {
   background-color: var(--divider-color-hover, var(--interactive-accent));
   border-color: var(--divider-color-hover, var(--interactive-accent));
   opacity: 1;

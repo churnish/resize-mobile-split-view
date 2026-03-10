@@ -1,0 +1,1 @@
+# resize-mobile-split-view

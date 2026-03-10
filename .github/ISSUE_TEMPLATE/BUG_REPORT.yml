@@ -1,0 +1,98 @@
+name: Bug report
+description: Report something that is not working as expected in the Resize Mobile Split View plugin
+labels:
+  - Bug report
+  - '⚪️ Pending'
+body:
+  - type: markdown
+    attributes:
+      value: '**Note:** If English is not your first language, please consider using AI tools like ChatGPT to translate your responses.'
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Bug report checklist
+      options:
+        - label: I have searched existing issues and this is not a duplicate
+          required: true
+        - label: I have updated to the latest version of Resize Mobile Split View
+          required: true
+        - label: I have updated to the latest version of Obsidian
+          required: true
+        - label: I can reproduce the issue in the sandbox vault, or after disabling all other third-party plugins and CSS snippets, switching to default theme, then restarting Obsidian
+          required: false
+  - type: markdown
+    attributes:
+      value: '&#8203;'
+  - type: markdown
+    attributes:
+      value: '## Required'
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Starting from scratch, what are the steps to make the bug happen?
+      placeholder: Write steps to reproduce here...
+    validations:
+      required: true
+  - type: textarea
+    id: expected-result
+    attributes:
+      label: Expected result
+      description: What do you expect to see after carrying out the steps above?
+      placeholder: Write expected result here...
+    validations:
+      required: true
+  - type: textarea
+    id: actual-result
+    attributes:
+      label: Actual result
+      description: |-
+        Instead of the expected result, what happened? You can attach screenshots or screen recordings that demonstrate the bug.
+      placeholder: Write actual result here...
+    validations:
+      required: true
+  - type: textarea
+    id: debug-info
+    attributes:
+      label: Debug information
+      description: |-
+        Paste Obsidian debug info here:
+
+        1. Open Command palette.
+        2. Search for then select "Show debug info".
+        3. Press "Copy to clipboard".
+        4. Paste the copied text here.
+      placeholder: Paste debug info here...
+      render: text
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: '&#8203;'
+  - type: markdown
+    attributes:
+      value: '## Optional'
+  - type: textarea
+    id: additional-info
+    attributes:
+      label: Additional information
+      description: Provide any additional information that you think might be helpful in solving the issue.
+      placeholder: Add additional information here...
+    validations:
+      required: false
+  - type: textarea
+    id: console-logs
+    attributes:
+      label: Console logs
+      description: |-
+        To share console logs:
+
+        1. Open developer tools in Obsidian (`Ctrl+Shift+I` on Windows/Linux, `Cmd+Option+I` on macOS).
+        2. Open the **Console** tab.
+        3. Reproduce the bug.
+        4. Share any console output that appears below.
+
+        **Note:** Console logs can contain file paths, note titles, and other vault details. Please review before sharing.
+      placeholder: Add console logs here...
+    validations:
+      required: false
