@@ -145,16 +145,14 @@ class ResizeMobileSplitPlugin extends Plugin {
     const cleanup = (ev) => {
       if (ev && (ev.pointerType !== pointerType || ev.pointerId !== pointerId))
         return;
-      if (ev) {
-        document.dispatchEvent(
-          new MouseEvent('mouseup', {
-            bubbles: true,
-            cancelable: true,
-            clientX: ev.clientX,
-            clientY: ev.clientY,
-          })
-        );
-      }
+      document.dispatchEvent(
+        new MouseEvent('mouseup', {
+          bubbles: true,
+          cancelable: true,
+          clientX: ev ? ev.clientX : 0,
+          clientY: ev ? ev.clientY : 0,
+        })
+      );
       handle.style.backgroundColor = '';
       handle.style.borderColor = '';
       handle.style.opacity = '';
@@ -162,7 +160,8 @@ class ResizeMobileSplitPlugin extends Plugin {
         capture: true,
       });
       touchTarget.style.touchAction = '';
-      touchTarget.removeAttribute('data-ignore-swipe');
+      if (touchTarget !== handle)
+        touchTarget.removeAttribute('data-ignore-swipe');
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', cleanup);
       document.removeEventListener('pointercancel', cleanup);
@@ -224,20 +223,22 @@ class ResizeMobileSplitPlugin extends Plugin {
       this._holdTimer = null;
       this._cancelHold = null;
       touchTarget.style.touchAction = '';
-      touchTarget.removeAttribute('data-ignore-swipe');
+      if (touchTarget !== handle)
+        touchTarget.removeAttribute('data-ignore-swipe');
       document.removeEventListener('pointermove', onHoldMove);
       document.removeEventListener('pointerup', cancelHold);
       document.removeEventListener('pointercancel', cancelHold);
     };
 
     const cancelHold = (ev) => {
-      if (ev && ev.pointerId !== e.pointerId) return;
+      if (ev && (ev.pointerType !== 'touch' || ev.pointerId !== e.pointerId))
+        return;
       teardownHold();
     };
 
     // Cancel hold if finger leaves the proximity zone around the handle
     const onHoldMove = (ev) => {
-      if (ev.pointerId !== e.pointerId) return;
+      if (ev.pointerType !== 'touch' || ev.pointerId !== e.pointerId) return;
       if (!this.findNearestHandle(ev.clientX, ev.clientY)) {
         teardownHold();
       }

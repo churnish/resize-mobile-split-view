@@ -1,1 +1,1 @@
-# resize-mobile-tabs
+# resize-mobile-split-view
