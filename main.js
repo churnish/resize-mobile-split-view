@@ -6,6 +6,7 @@ const { Platform, Plugin } = require('obsidian');
 class ResizeMobileSplitPlugin extends Plugin {
   _dragging = false;
   _cleanupDrag = null;
+  _cancelHold = null;
   _hoveredHandle = null;
   _holdTimer = null;
 
@@ -30,7 +31,7 @@ class ResizeMobileSplitPlugin extends Plugin {
       capture: true,
     });
     document.removeEventListener('pointermove', this.handlePointerMove);
-    clearTimeout(this._holdTimer);
+    if (this._cancelHold) this._cancelHold();
     if (this._cleanupDrag) this._cleanupDrag();
   }
 
@@ -81,8 +82,10 @@ class ResizeMobileSplitPlugin extends Plugin {
     }
     this._hoveredHandle = handle;
     if (handle) {
-      handle.style.backgroundColor = 'var(--divider-color-hover)';
-      handle.style.borderColor = 'var(--divider-color-hover)';
+      handle.style.backgroundColor =
+        'var(--divider-color-hover, var(--interactive-accent))';
+      handle.style.borderColor =
+        'var(--divider-color-hover, var(--interactive-accent))';
       handle.style.opacity = '1';
     }
   }
@@ -111,8 +114,10 @@ class ResizeMobileSplitPlugin extends Plugin {
       capture: true,
     });
 
-    handle.style.backgroundColor = 'var(--divider-color-hover)';
-    handle.style.borderColor = 'var(--divider-color-hover)';
+    handle.style.backgroundColor =
+      'var(--divider-color-hover, var(--interactive-accent))';
+    handle.style.borderColor =
+      'var(--divider-color-hover, var(--interactive-accent))';
     handle.style.opacity = '1';
 
     handle.dispatchEvent(
@@ -172,7 +177,7 @@ class ResizeMobileSplitPlugin extends Plugin {
   }
 
   handlePointerDown(e) {
-    if (this._dragging) return;
+    if (this._dragging || this._holdTimer !== null) return;
 
     // Only touch drags — mouse uses native handler, pen is ignored (matches iOS convention)
     if (e.pointerType !== 'touch') {
@@ -212,9 +217,12 @@ class ResizeMobileSplitPlugin extends Plugin {
       touchTarget.style.touchAction = 'none';
     }
 
-    const cancelHold = (ev) => {
-      if (ev.pointerId !== e.pointerId) return;
+    // Teardown hold-phase listeners and timer — called from cancelHold,
+    // timer callback, and onunload (via _cancelHold).
+    const teardownHold = () => {
       clearTimeout(this._holdTimer);
+      this._holdTimer = null;
+      this._cancelHold = null;
       touchTarget.style.touchAction = '';
       touchTarget.removeAttribute('data-ignore-swipe');
       document.removeEventListener('pointermove', onHoldMove);
@@ -222,23 +230,32 @@ class ResizeMobileSplitPlugin extends Plugin {
       document.removeEventListener('pointercancel', cancelHold);
     };
 
+    const cancelHold = (ev) => {
+      if (ev && ev.pointerId !== e.pointerId) return;
+      teardownHold();
+    };
+
     // Cancel hold if finger leaves the proximity zone around the handle
     const onHoldMove = (ev) => {
       if (ev.pointerId !== e.pointerId) return;
       if (!this.findNearestHandle(ev.clientX, ev.clientY)) {
-        cancelHold(ev);
+        teardownHold();
       }
     };
 
     document.addEventListener('pointermove', onHoldMove);
     document.addEventListener('pointerup', cancelHold);
     document.addEventListener('pointercancel', cancelHold);
+    this._cancelHold = teardownHold;
 
     this._holdTimer = setTimeout(() => {
-      document.removeEventListener('pointermove', onHoldMove);
-      document.removeEventListener('pointerup', cancelHold);
-      document.removeEventListener('pointercancel', cancelHold);
-      this.startDrag(handle, touchTarget, e, 'touch', e.pointerId);
+      teardownHold();
+      // Re-validate handle is still in the DOM (layout may have changed)
+      const liveHandle = document.contains(handle)
+        ? handle
+        : this.findNearestHandle(e.clientX, e.clientY);
+      if (!liveHandle) return;
+      this.startDrag(liveHandle, touchTarget, e, 'touch', e.pointerId);
     }, HOLD_DELAY);
   }
 }

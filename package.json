@@ -1,7 +1,7 @@
 {
-  "name": "resize-mobile-tabs",
-  "version": "0.1.0",
-  "description": "Enables pane resize via touch drag on mobile devices.",
+  "name": "resize-mobile-split-view",
+  "version": "1.0.0",
+  "description": "Drag divider line to resize tab groups on mobile.",
   "main": "main.js",
   "type": "module",
   "scripts": {

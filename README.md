@@ -1,10 +1,10 @@
-# Resize Mobile Tabs
+# Resize Mobile Split View
 
-Drag divider line to resize split view on mobile.
+Drag divider line to resize tab groups on mobile.
 
-Touch: Hold down the finger on the line for a brief moment then move as it lights up.
+**Touch:** Hold down the finger on the line for a brief moment then move as it lights up.
 
-Pointer: Press on divider then move as you hold — just like on desktop.
+**Pointer:** Press on the line then move as you hold — just like on desktop.
 
 Tested on iPad with iPadOS 26.
 

@@ -1,9 +1,9 @@
 {
-  "id": "resize-mobile-tabs",
-  "name": "Resize Mobile Tabs",
+  "id": "resize-mobile-split-view",
+  "name": "Resize Mobile Split View",
   "version": "1.0.0",
   "minAppVersion": "1.0.0",
-  "description": "Drag divider line to resize split view tabs on mobile.",
+  "description": "Drag divider line to resize tab groups on mobile.",
   "author": "churnish",
   "isDesktopOnly": false
 }
