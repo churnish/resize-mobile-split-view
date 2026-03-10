@@ -15,6 +15,8 @@ export default [
         console: 'readonly',
         document: 'readonly',
         MouseEvent: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
       },
     },
     rules: {

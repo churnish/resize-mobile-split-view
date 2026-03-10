@@ -1,3 +1,1 @@
 # resize-mobile-tabs
-
-

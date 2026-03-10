@@ -176,8 +176,10 @@ class ResizeMobileSplitPlugin extends Plugin {
 
     // Only touch drags — mouse uses native handler, pen is ignored (matches iOS convention)
     if (e.pointerType !== 'touch') {
-      if (e.pointerType === 'mouse' &&
-          !e.target.classList.contains('workspace-leaf-resize-handle')) {
+      if (
+        e.pointerType === 'mouse' &&
+        !e.target.classList.contains('workspace-leaf-resize-handle')
+      ) {
         this.setHandleHover(null);
       }
       return;
