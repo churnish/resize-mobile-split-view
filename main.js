@@ -1,7 +1,7 @@
 const { Platform, Plugin } = require('obsidian');
 
 // Obsidian's resize handles use mouse events, which don't fire from
-// touch/pen input on iOS. This bridges pointer→mouse so drags work.
+// touch input on iOS. This bridges pointer→mouse so drags work.
 
 class ResizeMobileSplitPlugin extends Plugin {
   _dragging = false;
@@ -92,8 +92,8 @@ class ResizeMobileSplitPlugin extends Plugin {
     this.setHandleHover(handle);
   }
 
-  // Shared drag logic for touch and pen — bridges pointer events to
-  // synthetic mouse events so Obsidian's resize handler responds.
+  // Bridges pointer events to synthetic mouse events so Obsidian's
+  // native resize handler responds to touch input.
   startDrag(handle, touchTarget, startEvent, pointerType, pointerId) {
     this._dragging = true;
     touchTarget.setAttr('data-ignore-swipe', true);
