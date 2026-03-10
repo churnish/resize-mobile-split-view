@@ -8,7 +8,7 @@ Drag divider line to resize tab groups on mobile.
 
 **Pointer:** Press on the line then move as you hold — just like on desktop.
 
-Tested on iPad with iPadOS 26.
+Tested on iPadOS 26.
 
 ## Installation
 
