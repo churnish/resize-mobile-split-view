@@ -6,6 +6,8 @@ const { Platform, Plugin } = require('obsidian');
 class ResizeMobileSplitPlugin extends Plugin {
   _dragging = false;
   _cleanupDrag = null;
+  _hoveredHandle = null;
+  _holdTimer = null;
 
   onload() {
     if (!Platform.isMobile) return;
@@ -23,6 +25,7 @@ class ResizeMobileSplitPlugin extends Plugin {
   }
 
   onunload() {
+    if (!Platform.isMobile) return;
     document.removeEventListener('pointerdown', this.handlePointerDown, {
       capture: true,
     });
@@ -94,7 +97,7 @@ class ResizeMobileSplitPlugin extends Plugin {
 
   // Shared drag logic for touch and pen — bridges pointer events to
   // synthetic mouse events so Obsidian's resize handler responds.
-  startDrag(handle, touchTarget, startEvent, pointerType) {
+  startDrag(handle, touchTarget, startEvent, pointerType, pointerId) {
     this._dragging = true;
     touchTarget.setAttr('data-ignore-swipe', true);
 
@@ -123,7 +126,7 @@ class ResizeMobileSplitPlugin extends Plugin {
     );
 
     const onMove = (ev) => {
-      if (ev.pointerType !== pointerType) return;
+      if (ev.pointerType !== pointerType || ev.pointerId !== pointerId) return;
       document.dispatchEvent(
         new MouseEvent('mousemove', {
           bubbles: true,
@@ -135,15 +138,18 @@ class ResizeMobileSplitPlugin extends Plugin {
     };
 
     const cleanup = (ev) => {
-      if (ev.pointerType !== pointerType) return;
-      document.dispatchEvent(
-        new MouseEvent('mouseup', {
-          bubbles: true,
-          cancelable: true,
-          clientX: ev.clientX,
-          clientY: ev.clientY,
-        })
-      );
+      if (ev && (ev.pointerType !== pointerType || ev.pointerId !== pointerId))
+        return;
+      if (ev) {
+        document.dispatchEvent(
+          new MouseEvent('mouseup', {
+            bubbles: true,
+            cancelable: true,
+            clientX: ev.clientX,
+            clientY: ev.clientY,
+          })
+        );
+      }
       handle.style.backgroundColor = '';
       handle.style.borderColor = '';
       handle.style.opacity = '';
@@ -204,7 +210,8 @@ class ResizeMobileSplitPlugin extends Plugin {
       touchTarget.style.touchAction = 'none';
     }
 
-    const cancelHold = () => {
+    const cancelHold = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
       clearTimeout(this._holdTimer);
       touchTarget.style.touchAction = '';
       touchTarget.removeAttribute('data-ignore-swipe');
@@ -218,7 +225,7 @@ class ResizeMobileSplitPlugin extends Plugin {
     this._holdTimer = setTimeout(() => {
       document.removeEventListener('pointerup', cancelHold);
       document.removeEventListener('pointercancel', cancelHold);
-      this.startDrag(handle, touchTarget, e, 'touch');
+      this.startDrag(handle, touchTarget, e, 'touch', e.pointerId);
     }, HOLD_DELAY);
   }
 }
