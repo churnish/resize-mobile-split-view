@@ -12,7 +12,7 @@ Tested on iPad with iPadOS 26.
 
 ## Installation
 
-Until _Resize Mobile Split View_ is made available in the plugin directory, follow the steps below to install it:
+Until _Resize Mobile Split View_ is [made available](https://github.com/obsidianmd/obsidian-releases/pull/10893) in the plugin directory, follow the steps below to install it:
 
 1. Download and enable the [BRAT](https://obsidian.md/plugins?id=obsidian42-brat) plugin.
 2. Run _Add a beta plugin for testing_ in the Command palette.
