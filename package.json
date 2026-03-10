@@ -1,0 +1,24 @@
+{
+  "name": "resize-mobile-tabs",
+  "version": "0.1.0",
+  "description": "Enables pane resize via touch drag on mobile devices.",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "build": "true",
+    "css": "true",
+    "knip": "true",
+    "preversion": "node version-bump.mjs --preflight",
+    "version": "node version-bump.mjs",
+    "postversion": "git push origin main --follow-tags --force-with-lease"
+  },
+  "keywords": [],
+  "author": "churnish",
+  "license": "GPL-3.0-only",
+  "devDependencies": {
+    "@eslint/js": "^9.39.3",
+    "eslint": "^9.39.3",
+    "eslint-plugin-obsidianmd": "^0.1.9",
+    "prettier": "^3.8.1"
+  }
+}

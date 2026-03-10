@@ -6,18 +6,26 @@ const { Notice, Plugin } = require('obsidian');
 class ResizeMobileSplitPlugin extends Plugin {
   onload() {
     this.handlePointerDown = this.handlePointerDown.bind(this);
-    document.addEventListener('pointerdown', this.handlePointerDown, { capture: true });
+    document.addEventListener('pointerdown', this.handlePointerDown, {
+      capture: true,
+    });
     this.markHandles();
-    this.registerEvent(this.app.workspace.on('layout-change', () => this.markHandles()));
+    this.registerEvent(
+      this.app.workspace.on('layout-change', () => this.markHandles())
+    );
     new Notice('Resize Mobile Split loaded #7');
   }
 
   onunload() {
-    document.removeEventListener('pointerdown', this.handlePointerDown, { capture: true });
+    document.removeEventListener('pointerdown', this.handlePointerDown, {
+      capture: true,
+    });
   }
 
   markHandles() {
-    for (const handle of document.querySelectorAll('.workspace-leaf-resize-handle')) {
+    for (const handle of document.querySelectorAll(
+      '.workspace-leaf-resize-handle'
+    )) {
       handle.setAttr('data-ignore-swipe', true);
     }
   }
@@ -27,7 +35,9 @@ class ResizeMobileSplitPlugin extends Plugin {
     let closest = null;
     let closestDist = threshold;
 
-    for (const handle of document.querySelectorAll('.workspace-leaf-resize-handle')) {
+    for (const handle of document.querySelectorAll(
+      '.workspace-leaf-resize-handle'
+    )) {
       const rect = handle.getBoundingClientRect();
       const isVertical = rect.height > rect.width;
 
@@ -62,34 +72,40 @@ class ResizeMobileSplitPlugin extends Plugin {
     const touchTarget = e.target;
     touchTarget.setAttr('data-ignore-swipe', true);
 
-    handle.dispatchEvent(new MouseEvent('mousedown', {
-      bubbles: true,
-      cancelable: true,
-      clientX: e.clientX,
-      clientY: e.clientY,
-      button: 0,
-    }));
+    handle.dispatchEvent(
+      new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        button: 0,
+      })
+    );
     e.preventDefault();
     e.stopPropagation();
 
     const onMove = (ev) => {
       if (ev.pointerType !== 'touch') return;
-      document.dispatchEvent(new MouseEvent('mousemove', {
-        bubbles: true,
-        cancelable: true,
-        clientX: ev.clientX,
-        clientY: ev.clientY,
-      }));
+      document.dispatchEvent(
+        new MouseEvent('mousemove', {
+          bubbles: true,
+          cancelable: true,
+          clientX: ev.clientX,
+          clientY: ev.clientY,
+        })
+      );
     };
 
     const onUp = (ev) => {
       if (ev.pointerType !== 'touch') return;
-      document.dispatchEvent(new MouseEvent('mouseup', {
-        bubbles: true,
-        cancelable: true,
-        clientX: ev.clientX,
-        clientY: ev.clientY,
-      }));
+      document.dispatchEvent(
+        new MouseEvent('mouseup', {
+          bubbles: true,
+          cancelable: true,
+          clientX: ev.clientX,
+          clientY: ev.clientY,
+        })
+      );
       touchTarget.removeAttribute('data-ignore-swipe');
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
