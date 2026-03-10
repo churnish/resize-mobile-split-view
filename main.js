@@ -1,25 +1,34 @@
-const { Notice, Plugin } = require('obsidian');
+const { Platform, Plugin } = require('obsidian');
 
 // Obsidian's resize handles use mouse events, which don't fire from
-// touch input on iOS. This bridges touch→mouse so finger drags work.
+// touch/pen input on iOS. This bridges pointer→mouse so drags work.
 
 class ResizeMobileSplitPlugin extends Plugin {
+  _dragging = false;
+  _cleanupDrag = null;
+
   onload() {
+    if (!Platform.isMobile) return;
+
     this.handlePointerDown = this.handlePointerDown.bind(this);
+    this.handlePointerMove = this.handlePointerMove.bind(this);
     document.addEventListener('pointerdown', this.handlePointerDown, {
       capture: true,
     });
-    this.markHandles();
+    document.addEventListener('pointermove', this.handlePointerMove);
+    this.app.workspace.onLayoutReady(() => this.markHandles());
     this.registerEvent(
       this.app.workspace.on('layout-change', () => this.markHandles())
     );
-    new Notice('Resize Mobile Split loaded #7');
   }
 
   onunload() {
     document.removeEventListener('pointerdown', this.handlePointerDown, {
       capture: true,
     });
+    document.removeEventListener('pointermove', this.handlePointerMove);
+    clearTimeout(this._holdTimer);
+    if (this._cleanupDrag) this._cleanupDrag();
   }
 
   markHandles() {
@@ -30,8 +39,8 @@ class ResizeMobileSplitPlugin extends Plugin {
     }
   }
 
-  findNearestHandle(x, y) {
-    const threshold = 30;
+  findNearestHandle(x, y, threshold = 30) {
+    // Default 30px — comfortable finger-tap radius on iOS
     let closest = null;
     let closestDist = threshold;
 
@@ -60,32 +69,61 @@ class ResizeMobileSplitPlugin extends Plugin {
     return closest;
   }
 
-  handlePointerDown(e) {
-    if (e.pointerType !== 'touch') return;
+  setHandleHover(handle) {
+    if (this._hoveredHandle === handle) return;
+    if (this._hoveredHandle) {
+      this._hoveredHandle.style.backgroundColor = '';
+      this._hoveredHandle.style.borderColor = '';
+      this._hoveredHandle.style.opacity = '';
+    }
+    this._hoveredHandle = handle;
+    if (handle) {
+      handle.style.backgroundColor = 'var(--divider-color-hover)';
+      handle.style.borderColor = 'var(--divider-color-hover)';
+      handle.style.opacity = '1';
+    }
+  }
 
+  handlePointerMove(e) {
+    if (e.pointerType !== 'mouse' || this._dragging || e.buttons) return;
     const handle = e.target.classList.contains('workspace-leaf-resize-handle')
       ? e.target
-      : this.findNearestHandle(e.clientX, e.clientY);
-    if (!handle) return;
+      : null;
+    this.setHandleHover(handle);
+  }
 
-    // Temporarily suppress sidebar swipe on the actual touch target
-    const touchTarget = e.target;
+  // Shared drag logic for touch and pen — bridges pointer events to
+  // synthetic mouse events so Obsidian's resize handler responds.
+  startDrag(handle, touchTarget, startEvent, pointerType) {
+    this._dragging = true;
     touchTarget.setAttr('data-ignore-swipe', true);
+
+    // Block touchmove to prevent iOS native text selection loupe.
+    // iOS's UILongPressGestureRecognizer operates on touch events
+    // (before pointer events) — touchmove.preventDefault() is the
+    // only mechanism that reaches the native gesture layer.
+    const blockTouchMove = (ev) => ev.preventDefault();
+    document.addEventListener('touchmove', blockTouchMove, {
+      passive: false,
+      capture: true,
+    });
+
+    handle.style.backgroundColor = 'var(--divider-color-hover)';
+    handle.style.borderColor = 'var(--divider-color-hover)';
+    handle.style.opacity = '1';
 
     handle.dispatchEvent(
       new MouseEvent('mousedown', {
         bubbles: true,
         cancelable: true,
-        clientX: e.clientX,
-        clientY: e.clientY,
+        clientX: startEvent.clientX,
+        clientY: startEvent.clientY,
         button: 0,
       })
     );
-    e.preventDefault();
-    e.stopPropagation();
 
     const onMove = (ev) => {
-      if (ev.pointerType !== 'touch') return;
+      if (ev.pointerType !== pointerType) return;
       document.dispatchEvent(
         new MouseEvent('mousemove', {
           bubbles: true,
@@ -96,8 +134,8 @@ class ResizeMobileSplitPlugin extends Plugin {
       );
     };
 
-    const onUp = (ev) => {
-      if (ev.pointerType !== 'touch') return;
+    const cleanup = (ev) => {
+      if (ev.pointerType !== pointerType) return;
       document.dispatchEvent(
         new MouseEvent('mouseup', {
           bubbles: true,
@@ -106,13 +144,82 @@ class ResizeMobileSplitPlugin extends Plugin {
           clientY: ev.clientY,
         })
       );
+      handle.style.backgroundColor = '';
+      handle.style.borderColor = '';
+      handle.style.opacity = '';
+      document.removeEventListener('touchmove', blockTouchMove, {
+        capture: true,
+      });
+      touchTarget.style.touchAction = '';
       touchTarget.removeAttribute('data-ignore-swipe');
       document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointerup', cleanup);
+      document.removeEventListener('pointercancel', cleanup);
+      this._dragging = false;
+      this._cleanupDrag = null;
     };
 
     document.addEventListener('pointermove', onMove);
-    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointerup', cleanup);
+    document.addEventListener('pointercancel', cleanup);
+    this._cleanupDrag = cleanup;
+  }
+
+  handlePointerDown(e) {
+    if (this._dragging) return;
+
+    // Only touch drags — mouse uses native handler, pen is ignored (matches iOS convention)
+    if (e.pointerType !== 'touch') {
+      if (e.pointerType === 'mouse' &&
+          !e.target.classList.contains('workspace-leaf-resize-handle')) {
+        this.setHandleHover(null);
+      }
+      return;
+    }
+
+    // Clear any leftover pointer hover state
+    this.setHandleHover(null);
+
+    // Only handle inside root workspace (not sidebars/modals/overlays)
+    if (!e.target.closest('.mod-root')) return;
+
+    const directHit = e.target.classList.contains(
+      'workspace-leaf-resize-handle'
+    );
+    const handle = directHit
+      ? e.target
+      : this.findNearestHandle(e.clientX, e.clientY);
+    if (!handle) return;
+
+    // Touch: hold-to-resize after delay
+    const touchTarget = e.target;
+    const HOLD_DELAY = 300;
+
+    // Direct hit: take full control. Proximity hit: let browser handle
+    // naturally — if iOS grabs the gesture (scroll/swipe), pointercancel
+    // fires and cancelHold cleans up before the timer completes.
+    if (directHit) {
+      e.preventDefault();
+      e.stopPropagation();
+      touchTarget.style.touchAction = 'none';
+    }
+
+    const cancelHold = () => {
+      clearTimeout(this._holdTimer);
+      touchTarget.style.touchAction = '';
+      touchTarget.removeAttribute('data-ignore-swipe');
+      document.removeEventListener('pointerup', cancelHold);
+      document.removeEventListener('pointercancel', cancelHold);
+    };
+
+    document.addEventListener('pointerup', cancelHold);
+    document.addEventListener('pointercancel', cancelHold);
+
+    this._holdTimer = setTimeout(() => {
+      document.removeEventListener('pointerup', cancelHold);
+      document.removeEventListener('pointercancel', cancelHold);
+      this.startDrag(handle, touchTarget, e, 'touch');
+    }, HOLD_DELAY);
   }
 }
 
