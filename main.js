@@ -217,14 +217,25 @@ class ResizeMobileSplitPlugin extends Plugin {
       clearTimeout(this._holdTimer);
       touchTarget.style.touchAction = '';
       touchTarget.removeAttribute('data-ignore-swipe');
+      document.removeEventListener('pointermove', onHoldMove);
       document.removeEventListener('pointerup', cancelHold);
       document.removeEventListener('pointercancel', cancelHold);
     };
 
+    // Cancel hold if finger leaves the proximity zone around the handle
+    const onHoldMove = (ev) => {
+      if (ev.pointerId !== e.pointerId) return;
+      if (!this.findNearestHandle(ev.clientX, ev.clientY)) {
+        cancelHold(ev);
+      }
+    };
+
+    document.addEventListener('pointermove', onHoldMove);
     document.addEventListener('pointerup', cancelHold);
     document.addEventListener('pointercancel', cancelHold);
 
     this._holdTimer = setTimeout(() => {
+      document.removeEventListener('pointermove', onHoldMove);
       document.removeEventListener('pointerup', cancelHold);
       document.removeEventListener('pointercancel', cancelHold);
       this.startDrag(handle, touchTarget, e, 'touch', e.pointerId);
