@@ -1,8 +1,12 @@
-* 2
-* 2.*
+* [0-9]
+* [0-9].*
 
 .claude/
+.vscode/
 node_modules/
+
+*.map
+*.zip
 
 .DS_Store
 data.json
