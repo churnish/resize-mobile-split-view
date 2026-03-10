@@ -1,0 +1,9 @@
+.rmsv-divider-active {
+  background-color: var(--divider-color-hover, var(--interactive-accent));
+  border-color: var(--divider-color-hover, var(--interactive-accent));
+  opacity: 1;
+}
+
+.rmsv-no-touch-action {
+  touch-action: none;
+}

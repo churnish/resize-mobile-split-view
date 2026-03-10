@@ -76,17 +76,11 @@ class ResizeMobileSplitPlugin extends Plugin {
   setHandleHover(handle) {
     if (this._hoveredHandle === handle) return;
     if (this._hoveredHandle) {
-      this._hoveredHandle.style.backgroundColor = '';
-      this._hoveredHandle.style.borderColor = '';
-      this._hoveredHandle.style.opacity = '';
+      this._hoveredHandle.classList.remove('rmsv-divider-active');
     }
     this._hoveredHandle = handle;
     if (handle) {
-      handle.style.backgroundColor =
-        'var(--divider-color-hover, var(--interactive-accent))';
-      handle.style.borderColor =
-        'var(--divider-color-hover, var(--interactive-accent))';
-      handle.style.opacity = '1';
+      handle.classList.add('rmsv-divider-active');
     }
   }
 
@@ -114,11 +108,7 @@ class ResizeMobileSplitPlugin extends Plugin {
       capture: true,
     });
 
-    handle.style.backgroundColor =
-      'var(--divider-color-hover, var(--interactive-accent))';
-    handle.style.borderColor =
-      'var(--divider-color-hover, var(--interactive-accent))';
-    handle.style.opacity = '1';
+    handle.classList.add('rmsv-divider-active');
 
     handle.dispatchEvent(
       new MouseEvent('mousedown', {
@@ -153,13 +143,11 @@ class ResizeMobileSplitPlugin extends Plugin {
           clientY: ev ? ev.clientY : 0,
         })
       );
-      handle.style.backgroundColor = '';
-      handle.style.borderColor = '';
-      handle.style.opacity = '';
+      handle.classList.remove('rmsv-divider-active');
       document.removeEventListener('touchmove', blockTouchMove, {
         capture: true,
       });
-      touchTarget.style.touchAction = '';
+      touchTarget.classList.remove('rmsv-no-touch-action');
       if (touchTarget !== handle)
         touchTarget.removeAttribute('data-ignore-swipe');
       document.removeEventListener('pointermove', onMove);
@@ -213,7 +201,7 @@ class ResizeMobileSplitPlugin extends Plugin {
     if (directHit) {
       e.preventDefault();
       e.stopPropagation();
-      touchTarget.style.touchAction = 'none';
+      touchTarget.classList.add('rmsv-no-touch-action');
     }
 
     // Teardown hold-phase listeners and timer — called from cancelHold,
@@ -222,7 +210,7 @@ class ResizeMobileSplitPlugin extends Plugin {
       clearTimeout(this._holdTimer);
       this._holdTimer = null;
       this._cancelHold = null;
-      touchTarget.style.touchAction = '';
+      touchTarget.classList.remove('rmsv-no-touch-action');
       if (touchTarget !== handle)
         touchTarget.removeAttribute('data-ignore-swipe');
       document.removeEventListener('pointermove', onHoldMove);
