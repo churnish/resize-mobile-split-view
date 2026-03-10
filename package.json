@@ -1,6 +1,6 @@
 {
   "name": "resize-mobile-split-view",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Drag divider line to resize tab groups on mobile.",
   "main": "main.js",
   "scripts": {
