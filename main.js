@@ -4,6 +4,7 @@ const { Platform, Plugin } = require('obsidian');
 // touch input on iOS. This bridges pointer→mouse so drags work.
 
 const SIDEBAR_HANDLE_HALF_WIDTH = 15; // Half the handle's CSS width (30px)
+const HOLD_DELAY_MS = 300;
 
 class ResizeMobileSplitPlugin extends Plugin {
   _dragging = false;
@@ -55,6 +56,7 @@ class ResizeMobileSplitPlugin extends Plugin {
       this._sidebarHandle.remove();
       this._sidebarHandle = null;
     }
+    this._workspace = null;
   }
 
   markHandles() {
@@ -116,7 +118,7 @@ class ResizeMobileSplitPlugin extends Plugin {
 
   // Bridges pointer events to synthetic mouse events so Obsidian's
   // native resize handler responds to touch input.
-  startDrag(handle, touchTarget, startEvent, pointerType, pointerId) {
+  startDrag(handle, touchTarget, startX, startY, pointerType, pointerId) {
     this._dragging = true;
     touchTarget.setAttr('data-ignore-swipe', true);
 
@@ -136,8 +138,8 @@ class ResizeMobileSplitPlugin extends Plugin {
       new MouseEvent('mousedown', {
         bubbles: true,
         cancelable: true,
-        clientX: startEvent.clientX,
-        clientY: startEvent.clientY,
+        clientX: startX,
+        clientY: startY,
         button: 0,
       })
     );
@@ -186,6 +188,7 @@ class ResizeMobileSplitPlugin extends Plugin {
   }
 
   updateSidebarHandle() {
+    if (this._sidebarDragging) return;
     const drawer = document.querySelector(
       '.workspace-drawer.mod-left.is-pinned'
     );
@@ -234,15 +237,15 @@ class ResizeMobileSplitPlugin extends Plugin {
 
     if (e.pointerType === 'mouse') {
       // Mouse: immediate drag
-      this.startSidebarDrag(e, 'mouse', e.pointerId);
+      this.startSidebarDrag(e.clientX, 'mouse', e.pointerId);
       return;
     }
 
     if (e.pointerType !== 'touch') return;
 
     // Touch: hold-to-resize after delay
-    const HOLD_DELAY = 300;
     const startX = e.clientX;
+    let lastX = startX;
 
     e.preventDefault();
     e.stopPropagation();
@@ -266,6 +269,7 @@ class ResizeMobileSplitPlugin extends Plugin {
 
     const onHoldMove = (ev) => {
       if (ev.pointerType !== 'touch' || ev.pointerId !== e.pointerId) return;
+      lastX = ev.clientX;
       if (Math.abs(ev.clientX - startX) > 30) {
         teardownHold();
       }
@@ -278,11 +282,11 @@ class ResizeMobileSplitPlugin extends Plugin {
 
     this._sidebarHoldTimer = setTimeout(() => {
       teardownHold();
-      this.startSidebarDrag(e, 'touch', e.pointerId);
-    }, HOLD_DELAY);
+      this.startSidebarDrag(lastX, 'touch', e.pointerId);
+    }, HOLD_DELAY_MS);
   }
 
-  startSidebarDrag(startEvent, pointerType, pointerId) {
+  startSidebarDrag(startX, pointerType, pointerId) {
     const drawer = document.querySelector(
       '.workspace-drawer.mod-left.is-pinned'
     );
@@ -292,7 +296,6 @@ class ResizeMobileSplitPlugin extends Plugin {
     this._sidebarDragging = true;
     this._dragging = true;
 
-    const startX = startEvent.clientX;
     const startWidth = drawer.offsetWidth;
     const minWidth =
       parseInt(
@@ -382,7 +385,8 @@ class ResizeMobileSplitPlugin extends Plugin {
 
     // Touch: hold-to-resize after delay
     const touchTarget = e.target;
-    const HOLD_DELAY = 300;
+    let lastX = e.clientX;
+    let lastY = e.clientY;
 
     // Direct hit: take full control. Proximity hit: let browser handle
     // naturally — if iOS grabs the gesture (scroll/swipe), pointercancel
@@ -416,6 +420,8 @@ class ResizeMobileSplitPlugin extends Plugin {
     // Cancel hold if finger leaves the proximity zone around the handle
     const onHoldMove = (ev) => {
       if (ev.pointerType !== 'touch' || ev.pointerId !== e.pointerId) return;
+      lastX = ev.clientX;
+      lastY = ev.clientY;
       if (!this.findNearestHandle(ev.clientX, ev.clientY)) {
         teardownHold();
       }
@@ -431,10 +437,17 @@ class ResizeMobileSplitPlugin extends Plugin {
       // Re-validate handle is still in the DOM (layout may have changed)
       const liveHandle = document.contains(handle)
         ? handle
-        : this.findNearestHandle(e.clientX, e.clientY);
+        : this.findNearestHandle(lastX, lastY);
       if (!liveHandle) return;
-      this.startDrag(liveHandle, touchTarget, e, 'touch', e.pointerId);
-    }, HOLD_DELAY);
+      this.startDrag(
+        liveHandle,
+        touchTarget,
+        lastX,
+        lastY,
+        'touch',
+        e.pointerId
+      );
+    }, HOLD_DELAY_MS);
   }
 }
 
