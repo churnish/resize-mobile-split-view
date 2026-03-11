@@ -3,12 +3,15 @@ const { Platform, Plugin } = require('obsidian');
 // Obsidian's resize handles use mouse events, which don't fire from
 // touch input on iOS. This bridges pointer→mouse so drags work.
 
+const SIDEBAR_HANDLE_HALF_WIDTH = 15; // Half the handle's CSS width (30px)
+
 class ResizeMobileSplitPlugin extends Plugin {
   _dragging = false;
   _cleanupDrag = null;
   _cancelHold = null;
   _hoveredHandle = null;
   _holdTimer = null;
+  _workspace = null;
   _sidebarHandle = null;
   _sidebarDragging = false;
   _cleanupSidebarDrag = null;
@@ -26,6 +29,7 @@ class ResizeMobileSplitPlugin extends Plugin {
     });
     document.addEventListener('pointermove', this.handlePointerMove);
     this.app.workspace.onLayoutReady(() => {
+      this._workspace = document.querySelector('.workspace');
       this.markHandles();
       this.updateSidebarHandle();
     });
@@ -185,23 +189,33 @@ class ResizeMobileSplitPlugin extends Plugin {
     const drawer = document.querySelector(
       '.workspace-drawer.mod-left.is-pinned'
     );
-    const workspace = document.querySelector('.workspace');
 
-    if (drawer && workspace) {
+    if (drawer && this._workspace) {
       if (!this._sidebarHandle) {
         const handle = document.createElement('div');
         handle.className = 'rmsv-sidebar-handle';
-        handle.setAttr('data-ignore-swipe', 'true');
-        handle.style.left = drawer.offsetWidth - 15 + 'px';
+        handle.setAttr('data-ignore-swipe', true);
+        handle.style.left =
+          drawer.offsetWidth - SIDEBAR_HANDLE_HALF_WIDTH + 'px';
         handle.addEventListener('pointerdown', this.handleSidebarPointerDown);
-        workspace.appendChild(handle);
+        // Appended to .workspace (not .workspace-drawer) because the
+        // drawer has overflow: hidden, which would clip the handle.
+        this._workspace.appendChild(handle);
         this._sidebarHandle = handle;
       } else {
-        // Update position — drawer width may have changed
-        this._sidebarHandle.style.left = drawer.offsetWidth - 15 + 'px';
+        this._sidebarHandle.style.left =
+          drawer.offsetWidth - SIDEBAR_HANDLE_HALF_WIDTH + 'px';
       }
     } else {
-      // Not pinned or no workspace — remove handle
+      // Not pinned or no workspace — remove handle and clear inline styles
+      const unpinnedDrawer = document.querySelector(
+        '.workspace-drawer.mod-left'
+      );
+      if (unpinnedDrawer) {
+        unpinnedDrawer.style.removeProperty('width');
+        unpinnedDrawer.style.removeProperty('min-width');
+        unpinnedDrawer.style.removeProperty('max-width');
+      }
       if (this._sidebarHandle) {
         if (this._cancelSidebarHold) this._cancelSidebarHold();
         if (this._cleanupSidebarDrag) this._cleanupSidebarDrag();
@@ -285,7 +299,7 @@ class ResizeMobileSplitPlugin extends Plugin {
         window
           .getComputedStyle(document.body)
           .getPropertyValue('--mobile-sidebar-width-pinned')
-      ) || 250;
+      ) || startWidth;
 
     const blockTouchMove = (ev) => ev.preventDefault();
     document.addEventListener('touchmove', blockTouchMove, {
@@ -308,8 +322,9 @@ class ResizeMobileSplitPlugin extends Plugin {
         Math.min(startWidth + delta, maxWidth)
       );
       drawer.style.width = newWidth + 'px';
+      drawer.style.minWidth = newWidth + 'px';
       drawer.style.maxWidth = newWidth + 'px';
-      handle.style.left = newWidth - 15 + 'px';
+      handle.style.left = newWidth - SIDEBAR_HANDLE_HALF_WIDTH + 'px';
     };
 
     const cleanup = (ev) => {
