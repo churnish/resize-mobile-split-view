@@ -4,6 +4,16 @@
   opacity: 1;
 }
 
+.rmsv-sidebar-handle {
+  position: absolute;
+  top: 0;
+  width: 30px;
+  height: 100%;
+  touch-action: none;
+  cursor: col-resize;
+  z-index: var(--layer-cover, 15);
+}
+
 .rmsv-no-touch-action {
   touch-action: none;
 }

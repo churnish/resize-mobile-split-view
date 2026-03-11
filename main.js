@@ -9,19 +9,31 @@ class ResizeMobileSplitPlugin extends Plugin {
   _cancelHold = null;
   _hoveredHandle = null;
   _holdTimer = null;
+  _sidebarHandle = null;
+  _sidebarDragging = false;
+  _cleanupSidebarDrag = null;
+  _cancelSidebarHold = null;
+  _sidebarHoldTimer = null;
 
   onload() {
     if (!Platform.isMobile) return;
 
     this.handlePointerDown = this.handlePointerDown.bind(this);
     this.handlePointerMove = this.handlePointerMove.bind(this);
+    this.handleSidebarPointerDown = this.handleSidebarPointerDown.bind(this);
     document.addEventListener('pointerdown', this.handlePointerDown, {
       capture: true,
     });
     document.addEventListener('pointermove', this.handlePointerMove);
-    this.app.workspace.onLayoutReady(() => this.markHandles());
+    this.app.workspace.onLayoutReady(() => {
+      this.markHandles();
+      this.updateSidebarHandle();
+    });
     this.registerEvent(
-      this.app.workspace.on('layout-change', () => this.markHandles())
+      this.app.workspace.on('layout-change', () => {
+        this.markHandles();
+        this.updateSidebarHandle();
+      })
     );
   }
 
@@ -33,6 +45,12 @@ class ResizeMobileSplitPlugin extends Plugin {
     document.removeEventListener('pointermove', this.handlePointerMove);
     if (this._cancelHold) this._cancelHold();
     if (this._cleanupDrag) this._cleanupDrag();
+    if (this._cancelSidebarHold) this._cancelSidebarHold();
+    if (this._cleanupSidebarDrag) this._cleanupSidebarDrag();
+    if (this._sidebarHandle) {
+      this._sidebarHandle.remove();
+      this._sidebarHandle = null;
+    }
   }
 
   markHandles() {
@@ -161,6 +179,162 @@ class ResizeMobileSplitPlugin extends Plugin {
     document.addEventListener('pointerup', cleanup);
     document.addEventListener('pointercancel', cleanup);
     this._cleanupDrag = cleanup;
+  }
+
+  updateSidebarHandle() {
+    const drawer = document.querySelector(
+      '.workspace-drawer.mod-left.is-pinned'
+    );
+    const workspace = document.querySelector('.workspace');
+
+    if (drawer && workspace) {
+      if (!this._sidebarHandle) {
+        const handle = document.createElement('div');
+        handle.className = 'rmsv-sidebar-handle';
+        handle.setAttr('data-ignore-swipe', 'true');
+        handle.style.left = drawer.offsetWidth - 15 + 'px';
+        handle.addEventListener('pointerdown', this.handleSidebarPointerDown);
+        workspace.appendChild(handle);
+        this._sidebarHandle = handle;
+      } else {
+        // Update position — drawer width may have changed
+        this._sidebarHandle.style.left = drawer.offsetWidth - 15 + 'px';
+      }
+    } else {
+      // Not pinned or no workspace — remove handle
+      if (this._sidebarHandle) {
+        if (this._cancelSidebarHold) this._cancelSidebarHold();
+        if (this._cleanupSidebarDrag) this._cleanupSidebarDrag();
+        this._sidebarHandle.remove();
+        this._sidebarHandle = null;
+      }
+    }
+  }
+
+  handleSidebarPointerDown(e) {
+    if (this._dragging || this._sidebarDragging) return;
+    if (this._sidebarHoldTimer !== null) return;
+
+    const handle = this._sidebarHandle;
+    if (!handle) return;
+
+    if (e.pointerType === 'mouse') {
+      // Mouse: immediate drag
+      this.startSidebarDrag(e, 'mouse', e.pointerId);
+      return;
+    }
+
+    if (e.pointerType !== 'touch') return;
+
+    // Touch: hold-to-resize after delay
+    const HOLD_DELAY = 300;
+    const startX = e.clientX;
+
+    e.preventDefault();
+    e.stopPropagation();
+    handle.classList.add('rmsv-no-touch-action');
+
+    const teardownHold = () => {
+      clearTimeout(this._sidebarHoldTimer);
+      this._sidebarHoldTimer = null;
+      this._cancelSidebarHold = null;
+      handle.classList.remove('rmsv-no-touch-action');
+      document.removeEventListener('pointermove', onHoldMove);
+      document.removeEventListener('pointerup', cancelHold);
+      document.removeEventListener('pointercancel', cancelHold);
+    };
+
+    const cancelHold = (ev) => {
+      if (ev && (ev.pointerType !== 'touch' || ev.pointerId !== e.pointerId))
+        return;
+      teardownHold();
+    };
+
+    const onHoldMove = (ev) => {
+      if (ev.pointerType !== 'touch' || ev.pointerId !== e.pointerId) return;
+      if (Math.abs(ev.clientX - startX) > 30) {
+        teardownHold();
+      }
+    };
+
+    document.addEventListener('pointermove', onHoldMove);
+    document.addEventListener('pointerup', cancelHold);
+    document.addEventListener('pointercancel', cancelHold);
+    this._cancelSidebarHold = teardownHold;
+
+    this._sidebarHoldTimer = setTimeout(() => {
+      teardownHold();
+      this.startSidebarDrag(e, 'touch', e.pointerId);
+    }, HOLD_DELAY);
+  }
+
+  startSidebarDrag(startEvent, pointerType, pointerId) {
+    const drawer = document.querySelector(
+      '.workspace-drawer.mod-left.is-pinned'
+    );
+    const handle = this._sidebarHandle;
+    if (!drawer || !handle) return;
+
+    this._sidebarDragging = true;
+    this._dragging = true;
+
+    const startX = startEvent.clientX;
+    const startWidth = drawer.offsetWidth;
+    const minWidth =
+      parseInt(
+        window
+          .getComputedStyle(document.body)
+          .getPropertyValue('--mobile-sidebar-width-pinned')
+      ) || 250;
+
+    const blockTouchMove = (ev) => ev.preventDefault();
+    document.addEventListener('touchmove', blockTouchMove, {
+      passive: false,
+      capture: true,
+    });
+
+    try {
+      handle.setPointerCapture(pointerId);
+    } catch {
+      // Pointer capture may fail if pointer was already released
+    }
+
+    const onMove = (ev) => {
+      if (ev.pointerType !== pointerType || ev.pointerId !== pointerId) return;
+      const delta = ev.clientX - startX;
+      const maxWidth = window.innerWidth * 0.5;
+      const newWidth = Math.max(
+        minWidth,
+        Math.min(startWidth + delta, maxWidth)
+      );
+      drawer.style.width = newWidth + 'px';
+      drawer.style.maxWidth = newWidth + 'px';
+      handle.style.left = newWidth - 15 + 'px';
+    };
+
+    const cleanup = (ev) => {
+      if (ev && (ev.pointerType !== pointerType || ev.pointerId !== pointerId))
+        return;
+      document.removeEventListener('touchmove', blockTouchMove, {
+        capture: true,
+      });
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', cleanup);
+      document.removeEventListener('pointercancel', cleanup);
+      try {
+        handle.releasePointerCapture(pointerId);
+      } catch {
+        // May already be released
+      }
+      this._sidebarDragging = false;
+      this._dragging = false;
+      this._cleanupSidebarDrag = null;
+    };
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', cleanup);
+    document.addEventListener('pointercancel', cleanup);
+    this._cleanupSidebarDrag = cleanup;
   }
 
   handlePointerDown(e) {
