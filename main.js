@@ -15,6 +15,7 @@ class ResizeMobileSplitPlugin extends Plugin {
   _workspace = null;
   _sidebarHandle = null;
   _sidebarDragging = false;
+
   _cleanupSidebarDrag = null;
   _cancelSidebarHold = null;
   _sidebarHoldTimer = null;
@@ -50,6 +51,7 @@ class ResizeMobileSplitPlugin extends Plugin {
     document.removeEventListener('pointermove', this.handlePointerMove);
     if (this._cancelHold) this._cancelHold();
     if (this._cleanupDrag) this._cleanupDrag();
+    this._workspace?.classList.remove('rmsv-no-select');
     if (this._cancelSidebarHold) this._cancelSidebarHold();
     if (this._cleanupSidebarDrag) this._cleanupSidebarDrag();
     if (this._sidebarHandle) {
@@ -116,16 +118,15 @@ class ResizeMobileSplitPlugin extends Plugin {
     this.setHandleHover(handle);
   }
 
-  // Bridges pointer events to synthetic mouse events so Obsidian's
-  // native resize handler responds to touch input.
+  // Bridges pointer events to synthetic mouse events so Obsidian's native
+  // resize handler responds to touch input.
   startDrag(handle, touchTarget, startX, startY, pointerType, pointerId) {
     this._dragging = true;
     touchTarget.setAttr('data-ignore-swipe', true);
+    this._workspace.classList.add('rmsv-no-select');
 
-    // Block touchmove to prevent iOS native text selection loupe.
-    // iOS's UILongPressGestureRecognizer operates on touch events
-    // (before pointer events) — touchmove.preventDefault() is the
-    // only mechanism that reaches the native gesture layer.
+    // Block touchmove to prevent browser scroll gesture from firing
+    // pointercancel mid-drag (especially for proximity-hit touches).
     const blockTouchMove = (ev) => ev.preventDefault();
     document.addEventListener('touchmove', blockTouchMove, {
       passive: false,
@@ -159,7 +160,7 @@ class ResizeMobileSplitPlugin extends Plugin {
     const cleanup = (ev) => {
       if (ev && (ev.pointerType !== pointerType || ev.pointerId !== pointerId))
         return;
-      document.dispatchEvent(
+      handle.dispatchEvent(
         new MouseEvent('mouseup', {
           bubbles: true,
           cancelable: true,
@@ -171,6 +172,7 @@ class ResizeMobileSplitPlugin extends Plugin {
       document.removeEventListener('touchmove', blockTouchMove, {
         capture: true,
       });
+      this._workspace?.classList.remove('rmsv-no-select');
       touchTarget.classList.remove('rmsv-no-touch-action');
       if (touchTarget !== handle)
         touchTarget.removeAttribute('data-ignore-swipe');

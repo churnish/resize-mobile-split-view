@@ -15,3 +15,8 @@
 .rmsv-no-touch-action {
   touch-action: none;
 }
+.rmsv-no-select,
+.rmsv-no-select * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
