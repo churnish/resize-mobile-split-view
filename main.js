@@ -297,6 +297,7 @@ class ResizeMobileSplitPlugin extends Plugin {
 
     this._sidebarDragging = true;
     this._dragging = true;
+    this._workspace.classList.add('rmsv-no-select');
 
     const startWidth = drawer.offsetWidth;
     const minWidth =
@@ -338,6 +339,7 @@ class ResizeMobileSplitPlugin extends Plugin {
       document.removeEventListener('touchmove', blockTouchMove, {
         capture: true,
       });
+      this._workspace?.classList.remove('rmsv-no-select');
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', cleanup);
       document.removeEventListener('pointercancel', cleanup);

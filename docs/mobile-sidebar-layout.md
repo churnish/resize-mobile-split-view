@@ -2,7 +2,7 @@
 title: Mobile sidebar layout
 description: CSS and DOM behavior of the pinned left sidebar on mobile — selectors, flex constraints, inline style persistence, and resize gotchas.
 author: 🤖 Generated with Claude Code
-last updated: 2026-03-11
+last updated: 2026-03-12
 ---
 # Mobile sidebar layout
 
@@ -30,4 +30,19 @@ The pinned sidebar has `flex: 0 1 auto` (`flex-shrink: 1`) and CSS `min-width` f
 **Observed**: 2026-03-11, Obsidian 1.8.10
 
 Inline `style` attributes on `.workspace-drawer` survive `layout-change` events and `requestSaveLayout` calls. Obsidian does NOT reset inline styles during layout recalculations. Styles must be explicitly cleared when state changes (e.g., sidebar unpin).
+
+## Sidebar open/close detection
+
+**Observed**: 2026-03-12, Obsidian 1.8.10
+
+On mobile, sidebar open/close state is reflected on `.workspace` via class names — NOT on the drawer elements themselves:
+
+- **Left sidebar open**: `.workspace.is-left-sidedock-open`
+- **Right sidebar open**: `.workspace.is-right-sidedock-open`
+
+Desktop uses `.workspace-drawer.mod-left.is-open` — this class does NOT exist on mobile. A `workspace-drawer-backdrop` element is added/removed from the DOM when sidebars open/close on mobile.
+
+## Swipe suppression
+
+Obsidian's mobile swipe-to-open gesture can be suppressed per-element via the `data-ignore-swipe` attribute. Elements with this attribute (or descendants of such elements) won't trigger sidebar swipe opens. Synthetic events dispatched on elements with `data-ignore-swipe` also carry the suppression — the event target is checked, not just the touch origin.
 
