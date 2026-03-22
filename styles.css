@@ -12,6 +12,9 @@
   cursor: col-resize;
   z-index: var(--layer-cover, 15);
 }
+.rmsv-sidebar-handle-right {
+  left: auto;
+}
 .rmsv-no-touch-action {
   touch-action: none;
 }

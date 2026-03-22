@@ -6,6 +6,11 @@ const { Platform, Plugin } = require('obsidian');
 const SIDEBAR_HANDLE_HALF_WIDTH = 15; // Half the handle's CSS width (30px)
 const HOLD_DELAY_MS = 300;
 
+const SIDES = {
+  left: { mod: 'mod-left', positionProp: 'left', direction: 1 },
+  right: { mod: 'mod-right', positionProp: 'right', direction: -1 },
+};
+
 class ResizeMobileSplitPlugin extends Plugin {
   _dragging = false;
   _cleanupDrag = null;
@@ -13,19 +18,30 @@ class ResizeMobileSplitPlugin extends Plugin {
   _hoveredHandle = null;
   _holdTimer = null;
   _workspace = null;
-  _sidebarHandle = null;
-  _sidebarDragging = false;
-
-  _cleanupSidebarDrag = null;
-  _cancelSidebarHold = null;
-  _sidebarHoldTimer = null;
+  _leftSidebar = {
+    handle: null,
+    dragging: false,
+    cleanupDrag: null,
+    cancelHold: null,
+    holdTimer: null,
+  };
+  _rightSidebar = {
+    handle: null,
+    dragging: false,
+    cleanupDrag: null,
+    cancelHold: null,
+    holdTimer: null,
+  };
 
   onload() {
     if (!Platform.isMobile) return;
 
     this.handlePointerDown = this.handlePointerDown.bind(this);
     this.handlePointerMove = this.handlePointerMove.bind(this);
-    this.handleSidebarPointerDown = this.handleSidebarPointerDown.bind(this);
+    this._leftSidebar.onPointerDown = (e) =>
+      this.handleSidebarPointerDown('left', e);
+    this._rightSidebar.onPointerDown = (e) =>
+      this.handleSidebarPointerDown('right', e);
     document.addEventListener('pointerdown', this.handlePointerDown, {
       capture: true,
     });
@@ -33,12 +49,14 @@ class ResizeMobileSplitPlugin extends Plugin {
     this.app.workspace.onLayoutReady(() => {
       this._workspace = document.querySelector('.workspace');
       this.markHandles();
-      this.updateSidebarHandle();
+      this.updateSidebarHandle('left');
+      this.updateSidebarHandle('right');
     });
     this.registerEvent(
       this.app.workspace.on('layout-change', () => {
         this.markHandles();
-        this.updateSidebarHandle();
+        this.updateSidebarHandle('left');
+        this.updateSidebarHandle('right');
       })
     );
   }
@@ -52,11 +70,13 @@ class ResizeMobileSplitPlugin extends Plugin {
     if (this._cancelHold) this._cancelHold();
     if (this._cleanupDrag) this._cleanupDrag();
     this._workspace?.classList.remove('rmsv-no-select');
-    if (this._cancelSidebarHold) this._cancelSidebarHold();
-    if (this._cleanupSidebarDrag) this._cleanupSidebarDrag();
-    if (this._sidebarHandle) {
-      this._sidebarHandle.remove();
-      this._sidebarHandle = null;
+    for (const side of [this._leftSidebar, this._rightSidebar]) {
+      if (side.cancelHold) side.cancelHold();
+      if (side.cleanupDrag) side.cleanupDrag();
+      if (side.handle) {
+        side.handle.remove();
+        side.handle = null;
+      }
     }
     this._workspace = null;
   }
@@ -189,57 +209,61 @@ class ResizeMobileSplitPlugin extends Plugin {
     this._cleanupDrag = cleanup;
   }
 
-  updateSidebarHandle() {
-    if (this._sidebarDragging) return;
+  updateSidebarHandle(sideName) {
+    const side = this[`_${sideName}Sidebar`];
+    const config = SIDES[sideName];
+    if (side.dragging) return;
+
     const drawer = document.querySelector(
-      '.workspace-drawer.mod-left.is-pinned'
+      `.workspace-drawer.${config.mod}.is-pinned`
     );
 
     if (drawer && this._workspace) {
-      if (!this._sidebarHandle) {
+      if (!side.handle) {
         const handle = document.createElement('div');
-        handle.className = 'rmsv-sidebar-handle';
+        handle.className = `rmsv-sidebar-handle rmsv-sidebar-handle-${sideName}`;
         handle.setAttr('data-ignore-swipe', true);
-        handle.style.left =
+        handle.style[config.positionProp] =
           drawer.offsetWidth - SIDEBAR_HANDLE_HALF_WIDTH + 'px';
-        handle.addEventListener('pointerdown', this.handleSidebarPointerDown);
+        handle.addEventListener('pointerdown', side.onPointerDown);
         // Appended to .workspace (not .workspace-drawer) because the
         // drawer has overflow: hidden, which would clip the handle.
         this._workspace.appendChild(handle);
-        this._sidebarHandle = handle;
+        side.handle = handle;
       } else {
-        this._sidebarHandle.style.left =
+        side.handle.style[config.positionProp] =
           drawer.offsetWidth - SIDEBAR_HANDLE_HALF_WIDTH + 'px';
       }
     } else {
       // Not pinned or no workspace — remove handle and clear inline styles
       const unpinnedDrawer = document.querySelector(
-        '.workspace-drawer.mod-left'
+        `.workspace-drawer.${config.mod}`
       );
       if (unpinnedDrawer) {
         unpinnedDrawer.style.removeProperty('width');
         unpinnedDrawer.style.removeProperty('min-width');
         unpinnedDrawer.style.removeProperty('max-width');
       }
-      if (this._sidebarHandle) {
-        if (this._cancelSidebarHold) this._cancelSidebarHold();
-        if (this._cleanupSidebarDrag) this._cleanupSidebarDrag();
-        this._sidebarHandle.remove();
-        this._sidebarHandle = null;
+      if (side.handle) {
+        if (side.cancelHold) side.cancelHold();
+        if (side.cleanupDrag) side.cleanupDrag();
+        side.handle.remove();
+        side.handle = null;
       }
     }
   }
 
-  handleSidebarPointerDown(e) {
-    if (this._dragging || this._sidebarDragging) return;
-    if (this._sidebarHoldTimer !== null) return;
+  handleSidebarPointerDown(sideName, e) {
+    const side = this[`_${sideName}Sidebar`];
+    if (this._dragging || side.dragging) return;
+    if (side.holdTimer !== null) return;
 
-    const handle = this._sidebarHandle;
+    const handle = side.handle;
     if (!handle) return;
 
     if (e.pointerType === 'mouse') {
       // Mouse: immediate drag
-      this.startSidebarDrag(e.clientX, 'mouse', e.pointerId);
+      this.startSidebarDrag(sideName, e.clientX, 'mouse', e.pointerId);
       return;
     }
 
@@ -254,9 +278,9 @@ class ResizeMobileSplitPlugin extends Plugin {
     handle.classList.add('rmsv-no-touch-action');
 
     const teardownHold = () => {
-      clearTimeout(this._sidebarHoldTimer);
-      this._sidebarHoldTimer = null;
-      this._cancelSidebarHold = null;
+      clearTimeout(side.holdTimer);
+      side.holdTimer = null;
+      side.cancelHold = null;
       handle.classList.remove('rmsv-no-touch-action');
       document.removeEventListener('pointermove', onHoldMove);
       document.removeEventListener('pointerup', cancelHold);
@@ -280,32 +304,34 @@ class ResizeMobileSplitPlugin extends Plugin {
     document.addEventListener('pointermove', onHoldMove);
     document.addEventListener('pointerup', cancelHold);
     document.addEventListener('pointercancel', cancelHold);
-    this._cancelSidebarHold = teardownHold;
+    side.cancelHold = teardownHold;
 
-    this._sidebarHoldTimer = setTimeout(() => {
+    side.holdTimer = setTimeout(() => {
       teardownHold();
-      this.startSidebarDrag(lastX, 'touch', e.pointerId);
+      this.startSidebarDrag(sideName, lastX, 'touch', e.pointerId);
     }, HOLD_DELAY_MS);
   }
 
-  startSidebarDrag(startX, pointerType, pointerId) {
+  startSidebarDrag(sideName, startX, pointerType, pointerId) {
+    const side = this[`_${sideName}Sidebar`];
+    const config = SIDES[sideName];
     const drawer = document.querySelector(
-      '.workspace-drawer.mod-left.is-pinned'
+      `.workspace-drawer.${config.mod}.is-pinned`
     );
-    const handle = this._sidebarHandle;
+    const handle = side.handle;
     if (!drawer || !handle) return;
 
-    this._sidebarDragging = true;
+    side.dragging = true;
     this._dragging = true;
     this._workspace.classList.add('rmsv-no-select');
 
     const startWidth = drawer.offsetWidth;
+    // Strip inline min-width (set by previous drag) to read the CSS value,
+    // then restore immediately to prevent visual reflow
+    drawer.style.removeProperty('min-width');
     const minWidth =
-      parseInt(
-        window
-          .getComputedStyle(document.body)
-          .getPropertyValue('--mobile-sidebar-width-pinned')
-      ) || startWidth;
+      parseInt(window.getComputedStyle(drawer).minWidth) || startWidth;
+    drawer.style.minWidth = startWidth + 'px';
 
     const blockTouchMove = (ev) => ev.preventDefault();
     document.addEventListener('touchmove', blockTouchMove, {
@@ -325,12 +351,13 @@ class ResizeMobileSplitPlugin extends Plugin {
       const maxWidth = window.innerWidth * 0.5;
       const newWidth = Math.max(
         minWidth,
-        Math.min(startWidth + delta, maxWidth)
+        Math.min(startWidth + config.direction * delta, maxWidth)
       );
       drawer.style.width = newWidth + 'px';
       drawer.style.minWidth = newWidth + 'px';
       drawer.style.maxWidth = newWidth + 'px';
-      handle.style.left = newWidth - SIDEBAR_HANDLE_HALF_WIDTH + 'px';
+      handle.style[config.positionProp] =
+        newWidth - SIDEBAR_HANDLE_HALF_WIDTH + 'px';
     };
 
     const cleanup = (ev) => {
@@ -348,15 +375,15 @@ class ResizeMobileSplitPlugin extends Plugin {
       } catch {
         // May already be released
       }
-      this._sidebarDragging = false;
+      side.dragging = false;
       this._dragging = false;
-      this._cleanupSidebarDrag = null;
+      side.cleanupDrag = null;
     };
 
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', cleanup);
     document.addEventListener('pointercancel', cleanup);
-    this._cleanupSidebarDrag = cleanup;
+    side.cleanupDrag = cleanup;
   }
 
   handlePointerDown(e) {
