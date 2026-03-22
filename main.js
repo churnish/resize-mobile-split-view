@@ -1,4 +1,4 @@
-const { Platform, Plugin } = require('obsidian');
+const { Platform, Plugin, PluginSettingTab, Setting } = require('obsidian');
 
 // Obsidian's resize handles use mouse events, which don't fire from
 // touch input on iOS. This bridges pointer→mouse so drags work.
@@ -10,6 +10,8 @@ const SIDES = {
   left: { mod: 'mod-left', positionProp: 'left', direction: 1 },
   right: { mod: 'mod-right', positionProp: 'right', direction: -1 },
 };
+
+const DEFAULT_SETTINGS = { holdToResize: true };
 
 class ResizeMobileSplitPlugin extends Plugin {
   _dragging = false;
@@ -33,7 +35,10 @@ class ResizeMobileSplitPlugin extends Plugin {
     holdTimer: null,
   };
 
-  onload() {
+  async onload() {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    this.addSettingTab(new ResizeMobileSplitSettingTab(this.app, this));
+
     if (!Platform.isMobile) return;
 
     this.handlePointerDown = this.handlePointerDown.bind(this);
@@ -269,6 +274,14 @@ class ResizeMobileSplitPlugin extends Plugin {
 
     if (e.pointerType !== 'touch') return;
 
+    // Instant drag when hold-to-resize is off
+    if (!this.settings.holdToResize) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.startSidebarDrag(sideName, e.clientX, 'touch', e.pointerId);
+      return;
+    }
+
     // Touch: hold-to-resize after delay
     const startX = e.clientX;
     let lastX = startX;
@@ -414,8 +427,25 @@ class ResizeMobileSplitPlugin extends Plugin {
       : this.findNearestHandle(e.clientX, e.clientY);
     if (!handle) return;
 
-    // Touch: hold-to-resize after delay
     const touchTarget = e.target;
+
+    // Instant drag for direct hits when hold-to-resize is off
+    if (!this.settings.holdToResize && directHit) {
+      e.preventDefault();
+      e.stopPropagation();
+      touchTarget.classList.add('rmsv-no-touch-action');
+      this.startDrag(
+        handle,
+        touchTarget,
+        e.clientX,
+        e.clientY,
+        'touch',
+        e.pointerId
+      );
+      return;
+    }
+
+    // Touch: hold-to-resize after delay
     let lastX = e.clientX;
     let lastY = e.clientY;
 
@@ -479,6 +509,30 @@ class ResizeMobileSplitPlugin extends Plugin {
         e.pointerId
       );
     }, HOLD_DELAY_MS);
+  }
+}
+
+class ResizeMobileSplitSettingTab extends PluginSettingTab {
+  constructor(app, plugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+
+  display() {
+    this.containerEl.empty();
+    new Setting(this.containerEl)
+      .setName('Hold to resize')
+      .setDesc(
+        'Require holding before dragging to resize. When off, drag starts immediately.'
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.holdToResize)
+          .onChange(async (value) => {
+            this.plugin.settings.holdToResize = value;
+            await this.plugin.saveData(this.plugin.settings);
+          })
+      );
   }
 }
 
