@@ -1,17 +1,19 @@
 ---
 title: Mobile sidebar layout
-description: CSS and DOM behavior of the pinned left sidebar on mobile — selectors, flex constraints, inline style persistence, and resize gotchas.
+description: CSS and DOM behavior of pinned sidebars (left and right) on mobile — selectors, flex constraints, inline style persistence, and resize gotchas.
 author: 🤖 Generated with Claude Code
-last updated: 2026-03-12
+last updated: 2026-03-22
 ---
 # Mobile sidebar layout
 
 ## Selectors
 
-- **Pinned sidebar**: `.workspace-drawer.mod-left.is-pinned` (NOT `.mod-left-split`)
-- **Unpinned sidebar**: `.workspace-drawer.mod-left` (without `.is-pinned`)
-- **Width CSS vars**: `--mobile-sidebar-width-pinned` (default width), `--mobile-sidebar-width` (max width)
-- **Border**: CSS-only via `border-right: var(--divider-width) solid var(--divider-color)` — no native resize handle element
+- **Pinned left sidebar**: `.workspace-drawer.mod-left.is-pinned` (NOT `.mod-left-split`)
+- **Pinned right sidebar**: `.workspace-drawer.mod-right.is-pinned`
+- **Unpinned left sidebar**: `.workspace-drawer.mod-left` (without `.is-pinned`)
+- **Unpinned right sidebar**: `.workspace-drawer.mod-right` (without `.is-pinned`)
+- **Width CSS vars**: `--mobile-sidebar-width-pinned` (default width, shared by both sides), `--mobile-sidebar-width` (max width)
+- **Border**: Left sidebar uses `border-right`, right sidebar uses `border-left` — CSS-only via `var(--divider-width) solid var(--divider-color)`, no native resize handle element
 
 All `.workspace-leaf-resize-handle` elements are inside `.mod-root`, not in sidebars.
 

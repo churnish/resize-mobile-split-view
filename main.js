@@ -14,6 +14,7 @@ const SIDES = {
 const DEFAULT_SETTINGS = { holdToResize: true };
 
 class ResizeMobileSplitPlugin extends Plugin {
+  // Shared mutex — set by any active drag (pane or sidebar) to block new starts
   _dragging = false;
   _cleanupDrag = null;
   _cancelHold = null;
@@ -74,6 +75,7 @@ class ResizeMobileSplitPlugin extends Plugin {
     document.removeEventListener('pointermove', this.handlePointerMove);
     if (this._cancelHold) this._cancelHold();
     if (this._cleanupDrag) this._cleanupDrag();
+    this.setHandleHover(null);
     this._workspace?.classList.remove('rmsv-no-select');
     for (const side of [this._leftSidebar, this._rightSidebar]) {
       if (side.cancelHold) side.cancelHold();
@@ -146,9 +148,10 @@ class ResizeMobileSplitPlugin extends Plugin {
   // Bridges pointer events to synthetic mouse events so Obsidian's native
   // resize handler responds to touch input.
   startDrag(handle, touchTarget, startX, startY, pointerType, pointerId) {
+    const workspace = this._workspace;
     this._dragging = true;
     touchTarget.setAttr('data-ignore-swipe', true);
-    this._workspace.classList.add('rmsv-no-select');
+    workspace.classList.add('rmsv-no-select');
 
     // Block touchmove to prevent browser scroll gesture from firing
     // pointercancel mid-drag (especially for proximity-hit touches).
@@ -197,7 +200,7 @@ class ResizeMobileSplitPlugin extends Plugin {
       document.removeEventListener('touchmove', blockTouchMove, {
         capture: true,
       });
-      this._workspace?.classList.remove('rmsv-no-select');
+      workspace?.classList.remove('rmsv-no-select');
       touchTarget.classList.remove('rmsv-no-touch-action');
       if (touchTarget !== handle)
         touchTarget.removeAttribute('data-ignore-swipe');
@@ -260,8 +263,7 @@ class ResizeMobileSplitPlugin extends Plugin {
 
   handleSidebarPointerDown(sideName, e) {
     const side = this[`_${sideName}Sidebar`];
-    if (this._dragging || side.dragging) return;
-    if (side.holdTimer !== null) return;
+    if (this._dragging || side.dragging || this._anyHoldActive()) return;
 
     const handle = side.handle;
     if (!handle) return;
@@ -327,6 +329,7 @@ class ResizeMobileSplitPlugin extends Plugin {
 
   startSidebarDrag(sideName, startX, pointerType, pointerId) {
     const side = this[`_${sideName}Sidebar`];
+    if (this._dragging || side.dragging) return;
     const config = SIDES[sideName];
     const drawer = document.querySelector(
       `.workspace-drawer.${config.mod}.is-pinned`
@@ -334,16 +337,17 @@ class ResizeMobileSplitPlugin extends Plugin {
     const handle = side.handle;
     if (!drawer || !handle) return;
 
+    const workspace = this._workspace;
     side.dragging = true;
     this._dragging = true;
-    this._workspace.classList.add('rmsv-no-select');
+    workspace.classList.add('rmsv-no-select');
 
     const startWidth = drawer.offsetWidth;
     // Strip inline min-width (set by previous drag) to read the CSS value,
     // then restore immediately to prevent visual reflow
     drawer.style.removeProperty('min-width');
-    const minWidth =
-      parseInt(window.getComputedStyle(drawer).minWidth) || startWidth;
+    const parsedMin = parseInt(window.getComputedStyle(drawer).minWidth);
+    const minWidth = isNaN(parsedMin) ? startWidth : parsedMin;
     drawer.style.minWidth = startWidth + 'px';
 
     const blockTouchMove = (ev) => ev.preventDefault();
@@ -358,10 +362,11 @@ class ResizeMobileSplitPlugin extends Plugin {
       // Pointer capture may fail if pointer was already released
     }
 
+    const maxWidth = window.innerWidth * 0.5;
+
     const onMove = (ev) => {
       if (ev.pointerType !== pointerType || ev.pointerId !== pointerId) return;
       const delta = ev.clientX - startX;
-      const maxWidth = window.innerWidth * 0.5;
       const newWidth = Math.max(
         minWidth,
         Math.min(startWidth + config.direction * delta, maxWidth)
@@ -379,7 +384,7 @@ class ResizeMobileSplitPlugin extends Plugin {
       document.removeEventListener('touchmove', blockTouchMove, {
         capture: true,
       });
-      this._workspace?.classList.remove('rmsv-no-select');
+      workspace?.classList.remove('rmsv-no-select');
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', cleanup);
       document.removeEventListener('pointercancel', cleanup);
@@ -399,8 +404,16 @@ class ResizeMobileSplitPlugin extends Plugin {
     side.cleanupDrag = cleanup;
   }
 
+  _anyHoldActive() {
+    return (
+      this._holdTimer !== null ||
+      this._leftSidebar.holdTimer !== null ||
+      this._rightSidebar.holdTimer !== null
+    );
+  }
+
   handlePointerDown(e) {
-    if (this._dragging || this._holdTimer !== null) return;
+    if (this._dragging || this._anyHoldActive()) return;
 
     // Only touch drags — mouse uses native handler, pen is ignored (matches iOS convention)
     if (e.pointerType !== 'touch') {
